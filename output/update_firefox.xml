@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<RDF:RDF xmlns:RDF="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+	<RDF:Description about="urn:mozilla:extension:{D46B87A9-7E64-489D-8C9E-57AF76BD47B6}">
+		<em:updates>
+			<RDF:Seq>
+				<RDF:li>
+					<RDF:Description>
+						<em:version>0.19.0</em:version>
+						<em:targetApplication>
+						<RDF:Description>
+							<em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
+							<em:minVersion>8.0</em:minVersion>
+							<em:maxVersion>23.*</em:maxVersion>
+							<em:updateLink>http://140.116.245.222:8080/extensions/crawlerblockeditor_0.19.0.xpi</em:updateLink>
+						</RDF:Description>
+						</em:targetApplication>
+					</RDF:Description>
+				</RDF:li>
+			</RDF:Seq>
+		</em:updates>
+		<em:version>0.19.0</em:version>
+		<em:updateLink>http://140.116.245.222:8080/extensions/crawlerblockeditor_0.19.0.xpi</em:updateLink>
+	</RDF:Description>
+</RDF:RDF>

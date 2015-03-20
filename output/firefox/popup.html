@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/html">
+<head lang="en">
+    <meta charset="UTF-8">
+
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/angular-sortable.css"/>
+    <link rel="stylesheet" type="text/css" href="css/myColorPicker.css"/>
+    <link rel="stylesheet" type="text/css" href="css/angular-ui-tree.min.css">
+    <link rel="stylesheet" type="text/css" href="popup.css">
+
+
+    <title>CrawlerNest Editor</title>
+</head>
+<body ng-app="editor" ng-controller="EditorController">
+<!--<div id="main" ng-style="{height:windowHeight}">-->
+
+
+<script type="text/ng-template" id="field_name_renderer.html">
+    <div class="form-group">
+        <label class="col-sm-2 control-label">名稱：</label>
+
+        <div class="col-sm-6" ng-class="$parent.blockForm.name.$error.required?'has-error':''">
+            <div class="input-group">
+                <input type="text" required name="name" class="form-control" placeholder="區塊名稱" ng-model="field.name"
+                       typeahead="name for name in getDefaultNames() | filter:$viewValue | limitTo:8">
+
+                <div class="input-group-btn" dropdown is-open="nameList.isopen">
+                    <button type="button" class="btn btn-default dropdown-toggle">
+                        預設
+                        <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu" style="max-height: 200px;overflow-y: auto;z-index: 20000;">
+                        <li ng-repeat="name in getDefaultNames() track by $index">
+                            <a href="#" ng-click="field.name=name;nameList.isopen=false;">{{name}}</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div ng-if="field.type != 'saveBlock' && (!field.path || field.path==0)" class="form-group">
+        <label class="col-sm-8 control-label text-danger">
+            <span class="glyphicon glyphicon-warning-sign"></span>
+            尚未擷取區塊，請使用擷取區塊按鈕。</label>
+    </div>
+</script>
+
+
+<!--區塊 title-->
+<script type="text/ng-template" id="field_title.html">
+    <button class="btn btn-success btn-xs pull-left" data-nodrag ng-click="field.collapsed = !field.collapsed">
+                <span class="glyphicon"
+                      ng-class="{'glyphicon-chevron-right': field.collapsed, 'glyphicon-chevron-down': !field.collapsed}"></span>
+    </button>
+    <div ui-tree-handle class="btn btn-xs tree-handle pull-left">
+        <span class="glyphicon glyphicon-list"></span>
+        名稱：{{field.name}}
+        <!--[{{getShortCSS(field.path) | limitTo:30 }}]-->
+    </div>
+
+    <button class="btn btn-info btn-xs pull-left"
+            ng-click="openTestFieldModal(field)">
+        <span class="glyphicon glyphicon-eye-open"></span>
+        檢視
+    </button>
+
+    <button ng-if="field.type === 'saveBlock'" class="btn btn-warning btn-xs  pull-left" ng-click="addField(field)">
+        新增區塊<span class="glyphicon glyphicon-plus"></span>
+    </button>
+
+    <button ng-if="field.type !== 'saveBlock'" class="btn btn-warning btn-xs"
+            ng-click="selectFieldPath($parent.$parent.$parent,field)">
+        <span class="glyphicon glyphicon-screenshot"></span>
+        擷取區塊
+    </button>
+
+    <div ng-if="field.type !== 'saveBlock'" class="col-sm-2 btn-group  pull-left" dropdown is-open="nameList.isopen">
+        <button type="button" class="btn btn-primary btn-xs dropdown-toggle">
+            儲存{{ getTypeName(field) }}
+            <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu" style="max-height: 200px; overflow-y: auto;z-index: 20000;">
+            <li ng-repeat="(key,value) in typeNames">
+                <a href="#" ng-click="setFieldType(field,key);nameList.isopen=false;">{{value}}</a>
+            </li>
+        </ul>
+    </div>
+
+    <button class="btn btn-danger btn-xs" type="button"
+            ng-model="field.manual" btn-checkbox
+            btn-checkbox-true="true" btn-checkbox-false="false">進階設定
+        <span ng-if="!field.manual" class="glyphicon glyphicon-plus"></span>
+        <span ng-if="field.manual" class="glyphicon glyphicon-minus"></span>
+    </button>
+
+    <button class="btn btn-danger btn-xs pull-right"
+            ng-click="removeField(this,field)">
+        <span class="glyphicon glyphicon-remove"></span>
+    </button>
+
+</script>
+
+<!-- field detail 樣板 -->
+<script type="text/ng-template" id="field_detail_renderer.html">
+
+    <div class="form-group">
+        <label class="col-sm-2 control-label">區塊：</label>
+
+        <div class="col-sm-6">
+            <input type="number" min="0" ng-pattern="/[0-9]*/" class="form-control" placeholder="區塊編號"
+                   ng-model="field.index" placeholder="區塊編號">
+        </div>
+
+        <!--<div class="col-sm-2">-->
+        <!--<button class="btn btn-warning" ng-click="selectFieldPath($parent.$parent)">-->
+        <!--<span class="glyphicon glyphicon-screenshot"></span>-->
+        <!--擷取區塊-->
+        <!--</button>-->
+        <!--</div>-->
+        <div ng-if="field.type === 'saveText' || field.type === 'saveHtml'" class="col-sm-2">
+            <button class="btn btn-warning" ng-click="openAdjustFieldModal(field)">
+                <span class="glyphicon glyphicon-screenshot"></span>
+                調整區塊
+            </button>
+
+        </div>
+        <!--<div class="col-sm-2" ng-if="field.fields.length">-->
+        <!--<button class="btn btn-warning" ng-click="generateFieldPath(field)">-->
+        <!--<span class="glyphicon glyphicon-upload"></span>-->
+        <!--產生父區塊-->
+        <!--</button>-->
+        <!--</div>-->
+    </div>
+
+
+    <!--<div class="form-group">-->
+    <!--<d3-bars bar-height="20" bar-padding="5" my-path="field.path" root="root" on-click="d3OnClick(item)">-->
+
+    <!--</d3-bars>-->
+    <!--</div>-->
+    <!--{{ field.path }}-->
+
+    <!--<div class="form-group">-->
+    <!--<label class="col-sm-2 control-label">編號：</label>-->
+
+
+    <!--<div class="col-sm-2">-->
+    <!--<a href="javascript:void(0)" class="btn btn-info"-->
+    <!--ng-click="openTestFieldModal(field)">-->
+    <!--<span class="glyphicon glyphicon-eye-open"></span>-->
+    <!--檢視-->
+    <!--</a>-->
+    <!--</div>-->
+    <!--</div>-->
+
+    <!--<div class="form-group">-->
+    <!--<label class="col-sm-2 control-label">儲存：</label>-->
+
+    <!--<div class="col-sm-2 checkbox">-->
+    <!--<label class="control-label" for="saveText">純文字</label>-->
+    <!--<input id="saveText" type="checkbox" ng-model="field.saveText"/>-->
+    <!--</div>-->
+    <!--<div class="col-sm-2 checkbox">-->
+    <!--<label class="control-label">連結</label>-->
+    <!--<input type="checkbox" ng-model="field.saveLink"/>-->
+    <!--</div>-->
+    <!--<div class="col-sm-2 checkbox">-->
+    <!--<label class="control-label">資源</label>-->
+    <!--<input type="checkbox" ng-model="field.saveResources"/>-->
+    <!--</div>-->
+    <!--<div class="col-sm-2 checkbox">-->
+    <!--<label class="control-label">原始碼</label>-->
+    <!--<input type="checkbox" ng-model="field.saveHTML"/>-->
+    <!--</div>-->
+    <!--</div>-->
+
+
+    <div ng-if="field.type === 'saveText' || field.type === 'saveHtml'" class="form-group">
+        <label class="col-sm-2 control-label">擷取測試：</label>
+
+        <div class="col-sm-6">
+            <input class="form-control" type="text" ng-model="field.testStr" placeholder="欲執行後處理，請按新增規則。"/>
+        </div>
+        <div class="col-sm-2">
+            <div class="btn btn-primary" ng-click="getTestString(field)">擷取</div>
+        </div>
+        <div class="col-sm-2">
+            <div class="btn btn-primary" ng-click="newReg(field)">新增規則</div>
+        </div>
+    </div>
+
+    <div ui-sortable="regOptions" ng-model="field.regs">
+        <div ng-repeat="reg in field.regs">
+            <div class="form-group">
+                <label class="col-sm-2 control-label">規則[{{$index + 1}}]：</label>
+
+                <div class="col-sm-6">
+                    <input class="form-control" type="text" ng-model="reg.regex" placeholder="正規表示式"/>
+
+                </div>
+                <!--<div class="col-sm-1">-->
+                <!--<span class="glyphicon glyphicon-chevron-right"></span>-->
+                <!--</div>-->
+                <div class="col-sm-2">
+                    <input class="form-control" type="text" ng-model="reg.replacement" placeholder="取代成..."/>
+                </div>
+                <div class="col-sm-1">
+                    <div class="btn btn-danger btn-sm" ng-click="removeRegex($parent.field.regs, reg)">
+                        <span class="glyphicon glyphicon-remove"></span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group" ng-if="field.regs && field.regs.length">
+        <hr/>
+        <label class="col-sm-2 control-label">結果預覽：</label>
+
+        <div class="col-sm-10">
+            <textarea disabled class="form-control"> {{ getTestResult(field) }} </textarea>
+        </div>
+    </div>
+
+</script>
+
+
+<!-- 群組節點樣板 -->
+<script type="text/ng-template" id="group_renderer.html">
+
+
+    <div class="group-title tree-content">
+        <div ng-include=" 'field_title.html' "></div>
+
+        <form class="form-horizontal" role="form" name="blockForm" ng-show="!field.collapsed">
+            <br style="clear: both"/>
+
+            <div ng-include=" 'field_name_renderer.html' "></div>
+
+            <div collapse="!field.manual" ng-include=" 'field_detail_renderer.html' "></div>
+
+        </form>
+
+
+    </div>
+</script>
+
+<!-- 子節點樣板 -->
+<script type="text/ng-template" id="field_renderer.html">
+
+    <div class="tree-content">
+        <!--<div>-->
+        <!--<div class="btn btn-success btn-xs pull-left" ng-click="field.collapsed = !field.collapsed">-->
+        <!--<span class="glyphicon"-->
+        <!--ng-class="{'glyphicon-chevron-right': field.collapsed, 'glyphicon-chevron-down': !field.collapsed}"></span>-->
+        <!--</div>-->
+
+
+        <!--<div ui-tree-handle class="btn btn-xs pull-left">-->
+        <!--<span class="glyphicon glyphicon-list"></span>-->
+        <!--區塊：{{field.name}} [{{getShortCSS(field.path) | limitTo:30}}]-->
+        <!--</div>-->
+
+
+        <!--<div class="btn btn-info btn-xs pull-left"-->
+        <!--ng-click="openTestFieldModal(field)">-->
+        <!--<span class="glyphicon glyphicon-eye-open"></span>-->
+        <!--檢視-->
+        <!--</div>-->
+
+        <!--<div class="btn btn-warning btn-xs" style="opacity: 0"></div>-->
+
+        <!--<div class="btn btn-danger btn-xs pull-right"-->
+        <!--ng-click="removeField(this)">-->
+        <!--<span class="glyphicon glyphicon-remove"></span>-->
+        <!--</div>-->
+        <!--</div>-->
+
+        <div ng-include=" 'field_title.html' "></div>
+
+        <form class="form-horizontal" role="form" name="blockForm" ng-show="!field.collapsed">
+            <br style="clear: both"/>
+
+            <div ng-include=" 'field_name_renderer.html' "></div>
+            <div collapse="!field.manual" ng-include=" 'field_detail_renderer.html' "></div>
+
+        </form>
+
+    </div>
+
+</script>
+
+
+<!-- 刪除任務樣板 -->
+<script type="text/ng-template" id="deleteTaskPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">是否刪除任務<{{currentTask.name}}>？</h3>
+    </div>
+    <div class="modal-body">
+        警告：這個動作無法復原！
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="removeTask()">確定</button>
+        <button class="btn btn-primary" ng-click="cancel()">取消</button>
+    </div>
+</script>
+
+<!-- 選取連結樣板 -->
+<script type="text/ng-template" id="selectURL.html">
+    <div class="modal-header">
+        <h3 class="modal-title">請選取欲擷取的URL群組</h3>
+    </div>
+    <div class="modal-body">
+        <div ng-repeat="(key, list) in dict" class="panel panel-success">
+            <div class="panel-heading">
+                <h3 class="panel-title">
+                    <input type="checkbox" ng-model="selectList[$index]" />
+                    正規表示式：{{key}}
+                    <button class="btn-small btn-primary" ng-click="setKey(key)">選我</button>
+                </h3>
+            </div>
+            <div class="panel-body">
+                <ul>
+                    <li ng-repeat="url in list track by $index"><a href="{{url}}" target="_blank">{{url}}</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="ok()">確定</button>
+        <button class="btn btn-primary" ng-click="cancel()">取消</button>
+    </div>
+</script>
+
+<!-- 未儲存資料樣板 -->
+<script type="text/ng-template" id="cancelTaskPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">偵測到未儲存的更動...</h3>
+    </div>
+    <div class="modal-body">
+        警告：所有未儲存的資料將會被捨棄！
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="ok()">確定</button>
+        <button class="btn btn-primary" ng-click="cancel()">取消</button>
+    </div>
+</script>
+
+
+<!-- 儲存驗證器樣板 -->
+<script type="text/ng-template" id="cannotSaveTaskPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">無法儲存，請確定所有的區塊都有填入合法的名稱和路徑！</h3>
+    </div>
+    <div class="modal-body">
+        網站名稱、來源、類型和頻道不可空白。
+
+        區塊名稱不可為空字串或是底線(_)。<br/>
+        區塊路徑不可為空字串。
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="cancel()">確定</button>
+    </div>
+</script>
+
+
+<!-- 通用訊息樣板 -->
+<script type="text/ng-template" id="messagePopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">{{ title }}</h3>
+    </div>
+    <div class="modal-body">
+        <div ng-bind-html="content"></div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="cancel()">確定</button>
+    </div>
+</script>
+
+<!-- CSS樣板 -->
+<script type="text/ng-template" id="cssPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">編輯欄位：{{ field.name }}</h3>
+    </div>
+    <div class="modal-body">
+        <div class="form-group">
+            <d3-bars bar-height="20" bar-padding="5" my-field="field" root="root"></d3-bars>
+        </div>
+        <div style="word-wrap:break-word;color:red;">{{ msg }}</div>
+        <b>CSS:</b>
+
+        <div style="word-wrap:break-word;">{{ field.path }}</div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-primary" ng-click="cancel()">結束</button>
+    </div>
+</script>
+
+<!-- Regex樣板 -->
+<script type="text/ng-template" id="regexPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">編輯欄位：{{ field.name }}</h3>
+    </div>
+    <div class="modal-body">
+
+        <div class="form-horizontal" role="form" ng-init="regs=[]">
+            <div class="btn btn-primary" ng-click="newReg(regs)">新增規則</div>
+            <div class="form-group" ng-if="regs">
+                <div class="col-sm-2">
+                    <label class="control-label">測試輸入：</label>
+
+                </div>
+                <div class="col-sm-8">
+                    <input class="form-control" type="text" ng-model="testStr"/>
+                </div>
+            </div>
+            <div ui-sortable="regOptions" ng-model="regs">
+                <div ng-repeat="reg in regs">
+                    <div class="form-group well well-sm">
+                        <div class="col-sm-2">
+                            <label class="control-label">取代規則[{{$index + 1}}]：</label>
+
+                        </div>
+                        <div class="col-sm-5">
+                            <input class="form-control" type="text" ng-model="reg.regex"/>
+
+                        </div>
+                        <!--<div class="col-sm-1">-->
+                        <!--<span class="glyphicon glyphicon-chevron-right"></span>-->
+                        <!--</div>-->
+                        <div class="col-sm-2">
+                            <input class="form-control" type="text" ng-model="reg.replacement"/>
+                        </div>
+                        <div class="col-sm-1">
+                            <div class="btn btn-danger btn-sm" ng-click="removeRegex(regs,reg)">
+                                <span class="glyphicon glyphicon-remove"></span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr/>
+            <div class="form-group">
+                <div class="col-sm-2">
+                    <label class="control-label">結果預覽：</label>
+
+                </div>
+                <div class="col-sm-8">
+                    <label class="form-control"> {{ getTestResult(this) }} </label>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!--results:-->
+    <!--<span ng-repeat="result in getTestResult(this)">-->
+    <!--<button class="btn btn-sm btn-danger" ng-click="$parent.index = $index;" ng-if="$index == index">{{ result-->
+    <!--}}-->
+    <!--</button>-->
+    <!--<button class="btn btn-sm btn-info" ng-click="$parent.index = $index;" ng-if="$index != index">{{ result-->
+    <!--}}-->
+    <!--</button>-->
+    <!--</span>-->
+
+    <div class="modal-footer">
+        <button class="btn btn-primary" ng-click="cancel()">結束</button>
+    </div>
+</script>
+
+
+<!-- 正規表示式樣板 -->
+<script type="text/ng-template" id="wrongRegexPopup.html">
+    <div class="modal-header">
+        <h3 class="modal-title">無法儲存，請確定輸入的正規表示式是合法的！</h3>
+    </div>
+    <div class="modal-body">
+        錯誤訊息：{{msg}}
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger" ng-click="cancel()">確定</button>
+    </div>
+</script>
+
+<!-- 編輯任務樣板 -->
+<script type="text/ng-template" id="taskDetailEditor.html">
+    <a ng-if="!popup" href="#" class="glyphicon glyphicon-new-window" ng-click="openEditorPage()"
+       style="float: right;margin-right: 10px"
+       title="彈出一個新的視窗，顯示完整的編輯畫面。">獨立畫面</a>
+    <div>
+        <h3 class="modal-title">{{currentTitle}}：{{currentTask.name}}</h3>
+    </div>
+
+    <accordion close-others="false">
+        <accordion-group is-open="step1">　
+            <accordion-heading>
+                <i class="pull-right glyphicon"
+                   ng-class="{'glyphicon-chevron-down': step1, 'glyphicon-chevron-right': !step1}"></i>
+                <a href="#">請移至欲監控的起始網頁，並設定以下參數。</a>
+            </accordion-heading>
+            <form class="form-horizontal" role="form" name="taskForm">
+                <div class="form-group" ng-class="taskForm.name.$error.required?'has-error':''">
+                    <label class="col-sm-2 control-label">任務名稱:</label>
+
+                    <div class="col-sm-8">
+                        <input type="text" name="name" class="form-control" placeholder="請輸入任務名稱"
+                               ng-model="currentTask.name" required/>
+                    </div>
+
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-primary" ng-click="setPageTitle();">填入標題</button>
+                        <!--<input type="text" class="col-sm-10 form-control" placeholder="請輸入起始網頁之網址。"-->
+                        <!--ng-model="currentTask.rootURL"/>-->
+                    </div>
+                </div>
+
+                <div class="form-group" ng-class="taskForm.sitetype.$error.required?'has-error':''">
+                    <label class="col-sm-2 control-label">網站類型:</label>
+
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" name="sitetype" placeholder="請輸入網站類型"
+                               required ng-model="currentTask.sitetype"/>
+                    </div>
+
+                    <div class="col-sm-2 btn-group" dropdown is-open="nameList.isopen">
+                        <button type="button" class="btn btn-primary dropdown-toggle" ng-disabled="disabled">
+                            類型
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" style="max-height: 200px;overflow-y: auto;z-index: 20000;">
+                            <li ng-repeat="name in ['社群','新聞','論壇','blog']">
+                                <a href="#" ng-click="currentTask.sitetype=name;nameList.isopen=false;">{{name}}</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="form-group" ng-class="taskForm.sourcename.$error.required?'has-error':''">
+                    <label class="col-sm-2 control-label">網站來源:</label>
+
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" placeholder="請輸入網站來源名稱"
+                               required name="sourcename" ng-model="currentTask.sourcename"/>
+                    </div>
+                </div>
+
+                <div class="form-group" ng-class="taskForm.sourcename.$error.required?'has-error':''">
+                    <label class="col-sm-2 control-label">網站頻道:</label>
+
+                    <div class="col-sm-8">
+                        <input type="text" required name="channel" class="form-control" placeholder="請輸入網站頻道名稱"
+                               required ng-model="currentTask.channel"/>
+                    </div>
+                </div>
+
+                <!--<div class="form-group">-->
+                <!--<label class="col-sm-2 control-label">測試用:</label>-->
+
+                <!--<div class="col-sm-8">-->
+                <!--<input type="checkbox" required class="form-control"-->
+                <!--ng-model="currentTask.fortest"/>-->
+                <!--</div>-->
+                <!--</div>-->
+
+                <!--<div class="form-group">-->
+                <!--<label class="col-sm-2 control-label">baseURL</label>-->
+
+                <!--<div class="col-sm-10">-->
+                <!--<input type="text" class="col-sm-10 form-control"/>-->
+                <!--</div>-->
+                <!--</div>-->
+                <!--<div class="form-group">-->
+                <!--<label class="col-sm-2 control-label">homePage</label>-->
+
+                <!--<div class="col-sm-10">-->
+                <!--<input type="text" class="col-sm-10 form-control"/>-->
+                <!--</div>-->
+                <!--</div>-->
+                <div class="form-group">
+                    <label class="col-sm-2 control-label" title="爬行網頁的起始點">起始頁面:</label>
+
+                    <div class="col-sm-8">
+                        <input type="text" class="col-sm-10 form-control" placeholder="請輸入起始網頁之網址。"
+                               ng-model="currentTask.rootURL"/>
+                    </div>
+
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-primary" ng-click="setPageUrl();">填入網址</button>
+                        <!--<input type="text" class="col-sm-10 form-control" placeholder="請輸入起始網頁之網址。"-->
+                        <!--ng-model="currentTask.rootURL"/>-->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="col-sm-2 control-label" title="只有符合此正規表示式的網址才會爬">爬行限制:</label>
+
+                    <div class="col-sm-6">
+                        <input type="text" class="col-sm-10 form-control" placeholder="請輸入正規表示式，擷取爬行網頁。"
+                               ng-model="currentTask.linkPage"/>
+                    </div>
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-info" ng-click="selectURL(true);">選爬行頁</button>
+                    </div>
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-primary" ng-click="testUrl(currentTask.linkPage);">爬行測試</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="col-sm-2 control-label" title="只有符合此正規表示式的網址才會進一步去擷取區塊">目標限制:</label>
+
+                    <div class="col-sm-6">
+                        <input type="text" class="col-sm-10 form-control" placeholder="請輸入正規表示式，擷取目標網頁。"
+                               ng-model="currentTask.targetPage"/>
+                    </div>
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-info" ng-click="selectURL(false);">選目標頁</button>
+                    </div>
+                    <div class="col-sm-2 ">
+                        <button class="btn btn-primary" ng-click="testUrl(currentTask.targetPage);">目標測試</button>
+                    </div>
+                </div>
+
+            </form>
+
+        </accordion-group>
+    </accordion>
+    <div>
+        <!--<accordion-group is-open="step2">　-->
+        <!--<accordion-heading>-->
+        <!--<i class="pull-right glyphicon"-->
+        <!--ng-class="{'glyphicon-chevron-down': step2, 'glyphicon-chevron-right': !step2}"></i>-->
+        <!--<a href="#">第二步：請移至欲擷取的目標網頁，並新增區塊。</a>-->
+        <!--</accordion-heading>-->
+
+        <div class="form-horizontal" role="form">
+
+            <div class="form-group">
+                <!--<span class="col-sm-2 control-label" title="只有符合此匹配的網頁才會進一步去擷取區塊">網頁區塊：</span>-->
+
+                <a href="#" class="col-sm-2 control-label glyphicon glyphicon-plus" ng-click="addField()">[新增區塊]</a>
+                <a href="#" class="col-sm-2 control-label glyphicon glyphicon-folder-open"
+                   ng-click="addGroup();">[新增群組]</a>
+
+                <!--<a href="#" class="col-sm-2 control-label glyphicon glyphicon-eye-open"-->
+                <!--ng-click="openTestFieldModal();">[擷取測試]</a>-->
+                <!--<span ng-if="!testTargetPage()" class="col-sm-5 control-label" style="color:red">(警告：此網頁非目標頁面！)</span>-->
+            </div>
+
+            <!--<a ng-click="clickField(Fields)">test</a>-->
+        </div>
+        <!--<div ui-tree id="tree-root" ng-if="currentTask">-->
+        <!--<ol ui-tree-nodes ng-model="currentTask.fields" data-max-depth="2" data-nodrop>-->
+        <!--<li ng-repeat="field in currentTask.fields" ui-tree-node-->
+        <!--ng-include="'nodes_renderer.html'"-->
+        <!--ng-show="visible(field)"></li>-->
+        <!--</ol>-->
+        <!--</div>-->
+
+
+        <div ui-tree="options">
+
+            <ol ui-tree-nodes ng-model="currentTask.fields" data-type="group">
+                <li ng-repeat="field in currentTask.fields" ng-init="level=0;fieldType = field.type" ui-tree-node
+                    class="fieldPanel">
+
+                    <div ng-if="field.fields.length || field.type === 'saveBlock'"
+                         ng-include=" 'group_renderer.html' "></div>
+                    <div ng-if="!field.fields.length && field.type !== 'saveBlock'"
+                         ng-include=" 'field_renderer.html' "></div>
+
+                    <div collapse="field.collapsed">
+                        <ol ui-tree-nodes ng-model="field.fields" data-type="category">
+                            <li ng-repeat="field in field.fields" ng-init="level=1" ui-tree-node>
+
+
+                                <div ng-include=" 'field_renderer.html' "></div>
+
+                            </li>
+                        </ol>
+                    </div>
+
+
+                    <!--<ol class="angular-ui-tree-nodes" data-nodrag>-->
+                    <!--<li class="angular-ui-tree-node">-->
+                    <!--<div class="category-title angular-ui-tree-handle">-->
+                    <!--</div>-->
+                    <!--</li>-->
+                    <!--</ol>-->
+                </li>
+            </ol>
+
+        </div>
+
+
+        <!--</accordion-group>-->
+    </div>
+
+
+    <div class="modal-footer">
+        <button class="btn btn-primary" ng-click="saveTask()">儲存</button>
+        <button class="btn btn-warning" ng-click="cancelTask()">取消</button>
+    </div>
+</script>
+
+
+<div ng-if="currentPage == 'view_task'" class="view-task" ng-init="onResize();">
+    <div>
+        <div ng-if="userName!=''">
+            選擇任務：
+            <div class="btn-group" dropdown is-open="status.isopen">
+                <button type="button" class="btn btn-primary dropdown-toggle" ng-disabled="disabled">
+                    <span ng-show="!currentTask">請選擇一個任務</span>
+                    <span ng-show="currentTask">{{currentTask.name}}</span>
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" style="max-height: 200px;overflow-y: auto">
+                    <li>
+                        <a href="#" ng-click="currentTask = null;status.isopen=false;">歡迎畫面</a>
+                    </li>
+                    <li class="divider"></li>
+                    <li ng-repeat="task in taskList track by $index">
+                        <a href="#" ng-click="setCurrentTask(task,$index);status.isopen=false;">{{task.name}}</a>
+                    </li>
+                    <li ng-show="taskList.length > 0" class="divider"></li>
+                    <li>
+                        <a href="#" ng-click="newTask();status.isopen=false;">新增任務</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+        <a href="#" ng-if="userName!=''" class="glyphicon glyphicon-plus" ng-click="newTask();"
+           style="float: right;">新增任務</a>
+        <a href="#" class="glyphicon glyphicon-new-window" ng-click="openMonitorPage()"
+           style="float: right;margin-right: 10px"
+           title="彈出一個新的視窗，顯示完整的任務監控畫面。">管理介面</a>
+        <a ng-if="!popup" href="#" class="glyphicon glyphicon-new-window" ng-click="openEditorPage()"
+           style="float: right;margin-right: 10px"
+           title="彈出一個新的視窗，顯示完整的編輯畫面。">獨立畫面</a>
+
+        <span ng-if="userName!=''"
+              style="float: right;margin-right: 10px"
+              title="登入。">你好，{{userName}}</span>
+
+
+        <!--<a href="#" class="glyphicon glyphicon-edit" ng-click="openOptionPage()"-->
+        <!--style="float: right;margin-right: 10px"-->
+        <!--title="選項設置畫面。">選項設置</a>-->
+
+        <hr/>
+        <div ng-if="!currentTask || userName==''">
+            <ul ng-if="userName!=''">
+                <li>
+                    歡迎使用編輯介面，初次使用請先<a href="#" ng-click="newTask();">新增任務</a>。
+                </li>
+                <li>
+                    欲檢視任務請使用上方的下拉式選單。
+                </li>
+
+            </ul>
+            <span ng-if="userName==''">您尚未登入，請先從<a href="#" class="glyphicon glyphicon-new-window"
+                                                   ng-click="openMonitorPage()">管理介面</a>登入．</span>
+
+
+        </div>
+        <div ng-if="userName!=''" class="well well-lg" ng-show="currentTask">
+            <span style="font-size: 20px">任務名稱：{{currentTask.name}}</span>
+            <a href="#" class="glyphicon glyphicon-trash text-danger" ng-click="openModal('deleteTaskPopup.html')"
+               style="float: right;">刪除任務</a>
+            <a href="#" class="glyphicon glyphicon-edit text-warning" ng-click="editTask();"
+               style="float: right;margin-right: 5px;">編輯任務</a>
+
+            <div collapse="!showTaskDetail && showTaskDetail!=null">
+                <span style="font-size: 20px">起始網頁：{{currentTask.rootURL}}</span>
+                <a href="#" class="glyphicon glyphicon-new-window"
+                   ng-click="openRootPage()">開啟</a>
+                <br/>
+                <!--<span style="font-size: 20px">基底網頁：{{currentTask.baseURL}}</span>-->
+                <!--<br/>-->
+                <span style="font-size: 20px">爬行匹配：{{currentTask.linkPage}}</span>
+                <br/>
+                <span style="font-size: 20px">目標匹配：{{currentTask.targetPage}}</span>
+                <br/>
+            <span style="font-size: 20px">區塊<span ng-if="!testTargetPage()" style="color:red">(此網頁非目標頁面)</span>：
+                <span ng-repeat="field in currentTask.fields track by $index">
+                    <b ng-if="field.name == '' || !field.name">區塊{{$index+1}}</b>
+                    <b ng-if="field.name != ''">{{field.name}}</b><b ng-if="!$last">, </b>
+                </span>
+            </span>
+                <!--<a href="#" ng-click="highlightAllBlock(currentTask);">[顯示區塊]</a>-->
+                <!--<a href="#" ng-click="removeAllhighlight(currentTask);">[隱藏區塊]</a>-->
+            </div>
+            <div>
+                <a href="#" ng-click="showTaskDetail = !showTaskDetail">
+                    <span ng-if="!showTaskDetail">[顯示設定]</span>
+                    <span ng-if="showTaskDetail">[隱藏設定]</span>
+                </a>
+            </div>
+
+            <!--<button type="button" class="btn btn-primary">編輯任務</button>-->
+            <!--<button type="button" class="btn btn-danger">刪除任務</button>-->
+            <hr/>
+            <div>
+                <a href="#" ng-click="exportSettings(currentTask);">匯出</a>
+                <!--或-->
+                <!--<a href="#" ng-click="importSettings(currentTask);">匯入</a>-->
+            </div>
+            <a href="#" class="glyphicon glyphicon-new-window" ng-click="openMonitorPage()" style="float: right;"
+               title="彈出一個新的視窗，顯示完整的任務監控畫面。">監控畫面</a>
+            <!--這裡預計是放目前選擇的任務資訊(待奕樵回應)<br/>-->
+            <!--ex:已抓取的網頁數量...<br/>-->
+            <!--ex:狀態...<br/>-->
+        </div>
+    </div>
+    <!--<div>-->
+    <!--<iframe width="100%" height="400px" ng-src="http://220.134.108.206:8002/"></iframe>-->
+    <!--</div>-->
+    <!--<iframe ng-if="popup" ng-src="{{ getMoniterURL() }}" class="monitor-page"></iframe>-->
+
+
+</div>
+
+<div ng-if="currentPage == 'edit_task'">
+
+    <div ng-include=" 'taskDetailEditor.html' "></div>
+
+</div>
+<!--<div ng-include=" 'regexPopup.html' "></div>-->
+<!--<div ng-if="currentPage == 'options'" class="monitor-page">-->
+<!--<div class="">-->
+<!--<div class="btn btn-primary pull-right" ng-click="currentPage = 'view_task'">結束</div>-->
+<!--</div>-->
+<!--<iframe src="options.html" class="monitor-page"></iframe>-->
+
+
+<!---->
+<!--</div>-->
+
+<!--<d3-bars bar-height="20" bar-padding="5" my-path="path" root="root" label="d3Label" on-click="d3OnClick(item)">-->
+
+<!--</d3-bars>-->
+
+<!--{{ path }}-->
+<!--<input ng-model="d3Data[0].score" type="text" />-->
+
+<!--<div id="d3"></div>-->
+
+<!--</div>-->
+
+
+<script type="text/javascript" src="kango-ui/kango_api.js"></script>
+<script type="text/javascript" src="js/underscore.min.js"></script>
+<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
+
+<!--<script type="text/javascript" src="js/bootstrap.min.js"></script>-->
+<script type="text/javascript" src="js/jquery.livequery.min.js"></script>
+<script type="text/javascript" src="js/angular.min.js"></script>
+<script type="text/javascript" src="js/angular-ui-tree.min.js"></script>
+<script type="text/javascript" src="js/sortable.js"></script>
+<script type="text/javascript" src="js/ui-bootstrap-tpls-0.11.0.min.js"></script>
+<script type="text/javascript" src="js/jquery.colorPicker.min.js"></script>
+
+<script type="text/javascript" src="storageServices.js"></script>
+<script type="text/javascript" src="settings.js"></script>
+<script type="text/javascript" src="utility.js"></script>
+<script type="text/javascript" src="d3Service.js"></script>
+<script type="text/javascript" src="directives.js"></script>
+
+<script type="text/javascript" src="js/d3.min.js"></script>
+
+<script type="text/javascript" src="popup.js"></script>
+
+
+<!--<script type="text/javascript" src="js/angular-sortable.js"></script>-->
+</body>
+</html>

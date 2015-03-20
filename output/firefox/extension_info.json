@@ -1,0 +1,31 @@
+{
+    "content_scripts": [
+        "inject.js"
+    ], 
+    "description": "CrawlerNest", 
+    "creator": "Tim", 
+    "framework_version": "1.7.3 36447b11bac0", 
+    "package_id": "kango-d46b87a9-7e64-489d-8c9e-57af76bd47b6", 
+    "background_scripts": [
+        "js/jquery-2.1.3.min.js", 
+        "settings.js", 
+        "storageServices.js", 
+        "main.js"
+    ], 
+    "homepage_url": "http://220.134.108.206/spidernest/", 
+    "version": "0.24.2", 
+    "options_page": "options.html", 
+    "framework_package_id": "dev", 
+    "browser_button": {
+        "caption": "CrawlerNest", 
+        "tooltipText": "CrawlerNest", 
+        "popup": {
+            "url": "popup.html", 
+            "width": 768, 
+            "height": 800
+        }, 
+        "icon": "icons/icon48.png"
+    }, 
+    "id": "{D46B87A9-7E64-489D-8C9E-57AF76BD47B6}", 
+    "name": "CrawlerNest"
+}
